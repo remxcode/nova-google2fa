@@ -25,7 +25,7 @@ class Google2FAAuthenticator extends Authenticator
      */
     protected function getGoogle2FASecretKey()
     {
-        $secret = $this->getUser()->user2fa->{$this->config('otp_secret_column')};
+        $secret = $this->getUser()->google2fa->{$this->config('otp_secret_column')};
         if (is_null($secret) || empty($secret)) {
             throw new Exception('Secret key cannot be empty.');
         }

@@ -4,6 +4,7 @@ namespace Lifeonscreen\Google2fa;
 
 use Laravel\Nova\Tool;
 use PragmaRX\Google2FA\Google2FA as G2fa;
+use PragmaRX\Google2FAQRCode\Google2FA as G2faQRCode;
 use PragmaRX\Recovery\Recovery;
 use Request;
 
@@ -18,6 +19,17 @@ class Google2fa extends Tool
     {
     }
 
+    public function generateGoogle2faUrl()
+    {
+        $google2fa = new G2faQRCode();
+
+        return $google2fa->getQRCodeInline(
+            config('app.name'),
+            auth()->user()->email,
+            auth()->user()->google2fa->google2fa_secret
+        );
+    }
+
     /**
      * @return \Illuminate\Contracts\View\Factory|\Illuminate\Http\RedirectResponse|\Illuminate\View\View
      * @throws \PragmaRX\Google2FA\Exceptions\InsecureCallException
@@ -25,22 +37,13 @@ class Google2fa extends Tool
     public function confirm()
     {
         if (app(Google2FAAuthenticator::class)->isAuthenticated()) {
-            auth()->user()->user2fa->google2fa_enable = 1;
-            auth()->user()->user2fa->save();
+            auth()->user()->google2fa->google2fa_enable = 1;
+            auth()->user()->google2fa->save();
 
             return response()->redirectTo(config('nova.path'));
         }
 
-        $google2fa = new G2fa();
-        $google2fa->setAllowInsecureCallToGoogleApis(true);
-
-        $google2fa_url = $google2fa->getQRCodeGoogleUrl(
-            config('app.name'),
-            auth()->user()->email,
-            auth()->user()->user2fa->google2fa_secret
-        );
-
-        $data['google2fa_url'] = $google2fa_url;
+        $data['google2fa_url'] = $this->generateGoogle2faUrl();
         $data['error'] = 'Secret is invalid.';
 
         return view('google2fa::register', $data);
@@ -52,16 +55,9 @@ class Google2fa extends Tool
      */
     public function register()
     {
-        $google2fa = new G2fa();
-        $google2fa->setAllowInsecureCallToGoogleApis(true);
+        $google2fa = new G2faQRCode();
 
-        $google2fa_url = $google2fa->getQRCodeGoogleUrl(
-            config('app.name'),
-            auth()->user()->email,
-            auth()->user()->user2fa->google2fa_secret
-        );
-
-        $data['google2fa_url'] = $google2fa_url;
+        $data['google2fa_url'] = $this->generateGoogle2faUrl();
 
         return view('google2fa::register', $data);
 
@@ -69,13 +65,7 @@ class Google2fa extends Tool
 
     private function isRecoveryValid($recover, $recoveryHashes)
     {
-        foreach ($recoveryHashes as $recoveryHash) {
-            if (password_verify($recover, $recoveryHash)) {
-                return true;
-            }
-        }
-
-        return false;
+        return in_array($recover,$recoveryHashes);
     }
 
     /**
@@ -84,7 +74,7 @@ class Google2fa extends Tool
     public function authenticate()
     {
         if ($recover = Request::get('recover')) {
-            if ($this->isRecoveryValid($recover, json_decode(auth()->user()->user2fa->recovery, true)) === false) {
+            if ($this->isRecoveryValid($recover, json_decode(auth()->user()->google2fa->recovery, true)) === false) {
                 $data['error'] = 'Recovery key is invalid.';
 
                 return view('google2fa::authenticate', $data);
@@ -104,14 +94,12 @@ class Google2fa extends Tool
                 $value = password_hash($value, config('lifeonscreen2fa.recovery_codes.hashing_algorithm'));
             });
 
-            $user2faModel = config('lifeonscreen2fa.models.user2fa');
-
-            $user2faModel::where('user_id', auth()->user()->id)->delete();
-            $user2fa = new $user2faModel();
-            $user2fa->user_id = auth()->user()->id;
-            $user2fa->google2fa_secret = $secretKey;
-            $user2fa->recovery = json_encode($recoveryHashes);
-            $user2fa->save();
+            auth()->user()->google2fa()->delete();
+            auth()->user()->google2fa()->create([
+                    'google2fa_secret'=>$secretKey,
+                    'recovery'=>json_encode($data['recovery']),
+                ]
+            );
 
             return response(view('google2fa::recovery', $data));
         }

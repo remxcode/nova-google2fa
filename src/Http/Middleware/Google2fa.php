@@ -34,7 +34,7 @@ class Google2fa
         if (auth()->guest() || $authenticator->isAuthenticated()) {
             return $next($request);
         }
-        if (empty(auth()->user()->user2fa) || auth()->user()->user2fa->google2fa_enable === 0) {
+        if (empty(auth()->user()->google2fa) || auth()->user()->google2fa->google2fa_enable === 0) {
 
             $google2fa = new G2fa();
             $recovery = new Recovery();
@@ -45,14 +45,12 @@ class Google2fa
                 ->setChars(config('lifeonscreen2fa.recovery_codes.chars_in_block'))
                 ->toArray();
 
-            $user2faModel = config('lifeonscreen2fa.models.user2fa');
-            $user2faModel::where('user_id', auth()->user()->id)->delete();
-
-            $user2fa = new $user2faModel();
-            $user2fa->user_id = auth()->user()->id;
-            $user2fa->google2fa_secret = $secretKey;
-            $user2fa->recovery = json_encode($data['recovery']);
-            $user2fa->save();
+            auth()->user()->google2fa()->delete();
+            auth()->user()->google2fa()->create([
+                    'google2fa_secret'=>$secretKey,
+                    'recovery'=>json_encode($data['recovery']),
+                ]
+            );
 
             return response(view('google2fa::recovery', $data));
         }

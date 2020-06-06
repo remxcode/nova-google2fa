@@ -3,7 +3,7 @@
 namespace Lifeonscreen\Google2fa\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\morphTo;
 
 /**
  * Class User2fa
@@ -14,13 +14,17 @@ class User2fa extends Model
     /**
      * @var string
      */
-    protected $table   = 'user_2fa';
+    protected $table   = 'google2fa';
 
+    protected $fillable = [
+        'google2fa_secret',
+        'recovery',
+    ];
     /**
-     * @return BelongsTo
+     * @return morphTo
      */
-    public function user(): BelongsTo
+    public function google2fable(): morphTo
     {
-        return $this->belongsTo(config('lifeonscreen2fa.models.user'));
+        return $this->morphTo();
     }
 }
