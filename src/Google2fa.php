@@ -55,8 +55,6 @@ class Google2fa extends Tool
      */
     public function register()
     {
-        $google2fa = new G2faQRCode();
-
         $data['google2fa_url'] = $this->generateGoogle2faUrl();
 
         return view('google2fa::register', $data);
